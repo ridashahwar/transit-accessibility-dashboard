@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Metro Vancouver Transit Accessibility Dashboard</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #1a1a2e; color: #eee; }
+        header {
+            background: #0f3460;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        header h1 { font-size: 1.2rem; color: #00d4ff; }
+        header p { font-size: 0.85rem; color: #aaa; }
+        #stats {
+            display: flex;
+            gap: 12px;
+            padding: 12px 24px;
+            background: #16213e;
+        }
+        .stat-card {
+            background: #0f3460;
+            border-radius: 8px;
+            padding: 12px 20px;
+            text-align: center;
+            flex: 1;
+        }
+        .stat-card .number { font-size: 1.6rem; font-weight: bold; color: #00d4ff; }
+        .stat-card .label { font-size: 0.75rem; color: #aaa; margin-top: 4px; }
+        #map { height: calc(100vh - 160px); width: 100%; }
+        .leaflet-popup-content-wrapper {
+            background: #0f3460;
+            color: #eee;
+            border: 1px solid #00d4ff;
+        }
+        .leaflet-popup-tip { background: #0f3460; }
+        .popup-title { font-weight: bold; color: #00d4ff; margin-bottom: 6px; }
+        .popup-row { font-size: 0.85rem; margin: 3px 0; }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+        .High { background: #00b894; color: #fff; }
+        .Medium { background: #fdcb6e; color: #333; }
+        .Low { background: #e17055; color: #fff; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div>
+        <h1>🚇 Metro Vancouver Transit Accessibility Dashboard</h1>
+        <p>Built with PostgreSQL · PostGIS · Leaflet · JavaScript · Real TransLink Open Data</p>
+    </div>
+</header>
+
+<div id="stats">
+    <div class="stat-card">
+        <div class="number" id="total-stops">8,919</div>
+        <div class="label">Total Transit Stops</div>
+    </div>
+    <div class="stat-card">
+        <div class="number" id="skytrain-stops">166</div>
+        <div class="label">SkyTrain Zone Stops</div>
+    </div>
+    <div class="stat-card">
+        <div class="number" id="bus-stops">8,594</div>
+        <div class="label">Bus Zone Stops</div>
+    </div>
+    <div class="stat-card">
+        <div class="number">95</div>
+        <div class="label">Max Connectivity Score</div>
+    </div>
+    <div class="stat-card">
+        <div class="number">Granville</div>
+        <div class="label">Most Connected Station</div>
+    </div>
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    const map = L.map('map').setView([49.2500, -122.9800], 11);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© OpenStreetMap © CARTO',
+        maxZoom: 19
+    }).addTo(map);
+
+    const stations = [
+        { name: "Granville Station", lat: 49.2827, lon: -123.1207, score: "High", nearby: 95 },
+        { name: "Waterfront Station", lat: 49.2857, lon: -123.1119, score: "High", nearby: 84 },
+        { name: "Vancouver City Centre", lat: 49.2827, lon: -123.1207, score: "High", nearby: 79 },
+        { name: "Burrard Station", lat: 49.2844, lon: -123.1207, score: "High", nearby: 68 },
+        { name: "Commercial-Broadway", lat: 49.2626, lon: -123.0695, score: "High", nearby: 52 },
+        { name: "Metrotown", lat: 49.2276, lon: -123.0076, score: "High", nearby: 43 },
+        { name: "Brentwood Town Centre", lat: 49.2665, lon: -123.0013, score: "High", nearby: 38 },
+        { name: "New Westminster", lat: 49.2018, lon: -122.9114, score: "Medium", nearby: 18 },
+        { name: "Lougheed Town Centre", lat: 49.2484, lon: -122.8959, score: "Medium", nearby: 15 },
+        { name: "King George", lat: 49.1826, lon: -122.8454, score: "Low", nearby: 8 },
+        { name: "Surrey Central", lat: 49.1894, lon: -122.8484, score: "Medium", nearby: 12 },
+        { name: "Production Way", lat: 49.2523, lon: -122.8869, score: "Low", nearby: 9 },
+        { name: "Broadway-City Hall", lat: 49.2634, lon: -123.1154, score: "High", nearby: 45 },
+        { name: "Nanaimo", lat: 49.2494, lon: -123.0517, score: "Medium", nearby: 19 },
+        { name: "29th Avenue", lat: 49.2402, lon: -123.0368, score: "Medium", nearby: 14 }
+    ];
+
+    const colors = { High: "#00b894", Medium: "#fdcb6e", Low: "#e17055" };
+
+    stations.forEach(s => {
+        const marker = L.circleMarker([s.lat, s.lon], {
+            radius: 10,
+            fillColor: colors[s.score],
+            color: "#fff",
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.9
+        }).addTo(map);
+
+        marker.bindPopup(`
+            <div class="popup-title">🚉 ${s.name}</div>
+            <div class="popup-row">Nearby Stops (500m): <strong>${s.nearby}</strong></div>
+            <div class="popup-row">Accessibility: <span class="badge ${s.score}">${s.score}</span></div>
+        `);
+    });
+
+    // Legend
+    const legend = L.control({ position: "bottomright" });
+    legend.onAdd = function() {
+        const div = L.DomUtil.create("div");
+        div.style.cssText = "background:#0f3460;padding:12px;border-radius:8px;color:#eee;font-size:0.85rem;border:1px solid #00d4ff";
+        div.innerHTML = `
+            <strong style="color:#00d4ff">Accessibility Score</strong><br><br>
+            <span style="color:#00b894">●</span> High (20+ nearby stops)<br>
+            <span style="color:#fdcb6e">●</span> Medium (10–19 stops)<br>
+            <span style="color:#e17055">●</span> Low (&lt;10 stops)
+        `;
+        return div;
+    };
+    legend.addTo(map);
+</script>
+</body>
+</html>
